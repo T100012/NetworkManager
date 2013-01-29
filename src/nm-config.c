@@ -268,6 +268,25 @@ nm_config_new (const char *cli_config_path,
 		config->path = g_strdup (NM_DEFAULT_SYSTEM_CONF_FILE);
 		fprintf (stderr, "No config file found or given; using %s\n",
 		         NM_DEFAULT_SYSTEM_CONF_FILE);
+
+		/* Honor CLI parameters */
+		if (cli_plugins && *cli_plugins)
+			config->plugins = g_strsplit_set (cli_plugins, ",", 0);
+
+		if (cli_log_level && *cli_log_level)
+			config->log_level = g_strdup (cli_log_level);
+
+		if (cli_log_domains && *cli_log_domains)
+			config->log_domains = g_strdup (cli_log_domains);
+
+		if (cli_connectivity_uri && *cli_connectivity_uri)
+			config->connectivity_uri = g_strdup (cli_connectivity_uri);
+
+		if (cli_connectivity_interval >= 0)
+			config->connectivity_interval = cli_connectivity_interval;
+
+		if (cli_connectivity_response && *cli_connectivity_response)
+			config->connectivity_response = g_strdup (cli_connectivity_response);
 	}
 
 	/* ignore error if config file not found */
