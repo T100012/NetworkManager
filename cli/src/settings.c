@@ -267,6 +267,7 @@ static NmcOutputField nmc_fields_setting_ip6_config[] = {
 	SETTING_FIELD (NM_SETTING_IP6_CONFIG_NEVER_DEFAULT, 15),           /* 8 */
 	SETTING_FIELD (NM_SETTING_IP6_CONFIG_MAY_FAIL, 12),                /* 9 */
 	SETTING_FIELD (NM_SETTING_IP6_CONFIG_IP6_PRIVACY, 15),             /* 10 */
+	SETTING_FIELD (NM_SETTING_IP6_CONFIG_DHCP_HOSTNAME, 14),           /* 11 */
 	{NULL, NULL, 0, NULL, 0}
 };
 #define NMC_FIELDS_SETTING_IP6_CONFIG_ALL     "name"","\
@@ -279,7 +280,8 @@ static NmcOutputField nmc_fields_setting_ip6_config[] = {
                                               NM_SETTING_IP6_CONFIG_IGNORE_AUTO_DNS","\
                                               NM_SETTING_IP6_CONFIG_NEVER_DEFAULT","\
                                               NM_SETTING_IP6_CONFIG_MAY_FAIL","\
-                                              NM_SETTING_IP6_CONFIG_IP6_PRIVACY
+                                              NM_SETTING_IP6_CONFIG_IP6_PRIVACY","\
+                                              NM_SETTING_IP6_CONFIG_DHCP_HOSTNAME
 #define NMC_FIELDS_SETTING_IP6_CONFIG_COMMON  NMC_FIELDS_SETTING_IP4_CONFIG_ALL
 
 /* Available fields for NM_SETTING_SERIAL_SETTING_NAME */
@@ -698,6 +700,64 @@ ip6_privacy_to_string (NMSettingIP6ConfigPrivacy ip6_privacy)
 }
 
 /*----------------------------------------------------------------------------*/
+
+gboolean
+setting_details (NMSetting *setting, NmCli *nmc)
+{
+	GType setting_type;
+
+	g_return_val_if_fail (NM_IS_SETTING (setting), FALSE);
+
+	setting_type = G_OBJECT_TYPE (setting);
+
+	if (setting_type == NM_TYPE_SETTING_CONNECTION)
+		return setting_connection_details (NM_SETTING_CONNECTION (setting), nmc);
+	else if (setting_type == NM_TYPE_SETTING_WIRED)
+		return setting_wired_details (NM_SETTING_WIRED (setting), nmc);
+	else if (setting_type == NM_TYPE_SETTING_802_1X)
+		return setting_802_1X_details (NM_SETTING_802_1X (setting), nmc);
+	else if (setting_type == NM_TYPE_SETTING_WIRELESS)
+		return setting_wireless_details (NM_SETTING_WIRELESS (setting), nmc);
+	else if (setting_type == NM_TYPE_SETTING_WIRELESS_SECURITY)
+		return setting_wireless_security_details (NM_SETTING_WIRELESS_SECURITY (setting), nmc);
+	else if (setting_type == NM_TYPE_SETTING_IP4_CONFIG)
+		return setting_ip4_config_details (NM_SETTING_IP4_CONFIG (setting), nmc);
+	else if (setting_type == NM_TYPE_SETTING_IP6_CONFIG)
+		return setting_ip6_config_details (NM_SETTING_IP6_CONFIG (setting), nmc);
+	else if (setting_type == NM_TYPE_SETTING_SERIAL)
+		return setting_serial_details (NM_SETTING_SERIAL (setting), nmc);
+	else if (setting_type == NM_TYPE_SETTING_PPP)
+		return setting_ppp_details (NM_SETTING_PPP (setting), nmc);
+	else if (setting_type == NM_TYPE_SETTING_PPPOE)
+		return setting_pppoe_details (NM_SETTING_PPPOE (setting), nmc);
+	else if (setting_type == NM_TYPE_SETTING_GSM)
+		return setting_gsm_details (NM_SETTING_GSM (setting), nmc);
+	else if (setting_type == NM_TYPE_SETTING_CDMA)
+		return setting_cdma_details (NM_SETTING_CDMA (setting), nmc);
+	else if (setting_type == NM_TYPE_SETTING_BLUETOOTH)
+		return setting_bluetooth_details (NM_SETTING_BLUETOOTH (setting), nmc);
+	else if (setting_type == NM_TYPE_SETTING_OLPC_MESH)
+		return setting_olpc_mesh_details (NM_SETTING_OLPC_MESH (setting), nmc);
+	else if (setting_type == NM_TYPE_SETTING_VPN)
+		return setting_vpn_details (NM_SETTING_VPN (setting), nmc);
+	else if (setting_type == NM_TYPE_SETTING_WIMAX)
+		return setting_wimax_details (NM_SETTING_WIMAX (setting), nmc);
+	else if (setting_type == NM_TYPE_SETTING_INFINIBAND)
+		return setting_infiniband_details (NM_SETTING_INFINIBAND (setting), nmc);
+	else if (setting_type == NM_TYPE_SETTING_BOND)
+		return setting_bond_details (NM_SETTING_BOND (setting), nmc);
+	else if (setting_type == NM_TYPE_SETTING_VLAN)
+		return setting_vlan_details (NM_SETTING_VLAN (setting), nmc);
+	else if (setting_type == NM_TYPE_SETTING_ADSL)
+		return setting_adsl_details (NM_SETTING_ADSL (setting), nmc);
+	else if (setting_type == NM_TYPE_SETTING_BRIDGE)
+		return setting_bridge_details (NM_SETTING_BRIDGE (setting), nmc);
+	else if (setting_type == NM_TYPE_SETTING_BRIDGE_PORT)
+		return setting_bridge_port_details (NM_SETTING_BRIDGE_PORT (setting), nmc);
+	else
+		/* should not be reached */
+		return FALSE;
+}
 
 gboolean
 setting_connection_details (NMSettingConnection *s_con, NmCli *nmc)
@@ -1365,6 +1425,7 @@ setting_ip6_config_details (NMSettingIP6Config *s_ip6, NmCli *nmc)
 	nmc->allowed_fields[8].value = nm_setting_ip6_config_get_never_default (s_ip6) ? _("yes") : _("no");
 	nmc->allowed_fields[9].value = nm_setting_ip6_config_get_may_fail (s_ip6) ? _("yes") : _("no");
 	nmc->allowed_fields[10].value = ip6_privacy_str;
+	nmc->allowed_fields[11].value = nm_setting_ip6_config_get_dhcp_hostname (s_ip6);
 
 	nmc->print_fields.flags = multiline_flag | mode_flag | escape_flag | NMC_PF_FLAG_SECTION_PREFIX;
 	print_fields (nmc->print_fields, nmc->allowed_fields); /* Print values */
