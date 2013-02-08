@@ -531,7 +531,7 @@ nm_manager_update_state (NMManager *manager)
 				new_state = NM_STATE_CONNECTED_GLOBAL;
 #if WITH_CONCHECK
 				/* Connectivity check might have a better idea */
-				if (nm_connectivity_get_connected (priv->connectivity) == FALSE)
+				if (nm_connectivity_get_state (priv->connectivity) != NM_CONNECTIVITY_STATE_CONNECTED)
 					new_state = NM_STATE_CONNECTED_SITE;
 #endif
 				break;
@@ -3820,12 +3820,23 @@ connectivity_changed (NMConnectivity *connectivity,
                       gpointer user_data)
 {
 	NMManager *self = NM_MANAGER (user_data);
-	gboolean connected;
+	NMConnectivityState state;
+	char state_str[100];
 
-	connected = nm_connectivity_get_connected (connectivity);
-	nm_log_dbg (LOGD_CORE, "connectivity checking indicates %s",
-	            connected ? "CONNECTED" : "NOT CONNECTED");
+	state = nm_connectivity_get_state (connectivity);
 
+    switch (state) {
+        case NM_CONNECTIVITY_STATE_CONNECTED:
+            strcpy (state_str, "CONNECTED");
+            break;
+        case NM_CONNECTIVITY_STATE_BEHIND_CAPTIVE_PORTAL:
+            strcpy (state_str, "BEHIND CAPTIVE PORTAL");
+            break;
+        default:
+            strcpy (state_str, "NOT CONNECTED");
+    }
+
+	nm_log_dbg (LOGD_CORE, "connectivity checking indicates %s", state_str);
 	nm_manager_update_state (self);
 }
 #endif  /* WITH_CONCHECK */
@@ -4092,7 +4103,7 @@ nm_manager_new (NMSettings *settings,
 #if WITH_CONCHECK
 	priv->connectivity = nm_connectivity_new (connectivity_uri, connectivity_interval, connectivity_response);
 
-	g_signal_connect (priv->connectivity, "notify::" NM_CONNECTIVITY_CONNECTED,
+	g_signal_connect (priv->connectivity, "notify::" NM_CONNECTIVITY_STATE,
 	                  G_CALLBACK (connectivity_changed), singleton);
 #endif
 

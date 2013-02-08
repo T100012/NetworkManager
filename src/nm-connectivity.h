@@ -39,8 +39,13 @@
 #define NM_CONNECTIVITY_URI       "uri"
 #define NM_CONNECTIVITY_INTERVAL  "interval"
 #define NM_CONNECTIVITY_RESPONSE  "response"
-#define NM_CONNECTIVITY_CONNECTED "connected"
+#define NM_CONNECTIVITY_STATE     "state"
 
+typedef enum {
+	NM_CONNECTIVITY_STATE_NOT_CONNECTED,
+	NM_CONNECTIVITY_STATE_CONNECTED,
+	NM_CONNECTIVITY_STATE_BEHIND_CAPTIVE_PORTAL
+} NMConnectivityState;
 
 typedef struct {
 	GObject parent;
@@ -57,10 +62,10 @@ NMConnectivity *nm_connectivity_new           (const gchar *check_uri,
                                                guint check_interval,
                                                const gchar *check_response);
 
-void            nm_connectivity_start_check   (NMConnectivity *connectivity);
+void                nm_connectivity_start_check (NMConnectivity *connectivity);
 
-void            nm_connectivity_stop_check    (NMConnectivity *connectivity);
+void                nm_connectivity_stop_check  (NMConnectivity *connectivity);
 
-gboolean        nm_connectivity_get_connected (NMConnectivity *connectivity);
+NMConnectivityState nm_connectivity_get_state   (NMConnectivity *connectivity);
 
 #endif /* NM_CONNECTIVITY_H */

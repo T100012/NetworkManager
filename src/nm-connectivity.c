@@ -27,6 +27,7 @@
 #include "nm-connectivity.h"
 #include "nm-logging.h"
 #include "nm-manager.h"
+#include "nm-enum-types.h"
 
 G_DEFINE_TYPE (NMConnectivity, nm_connectivity, G_TYPE_OBJECT)
 
@@ -46,8 +47,8 @@ typedef struct {
 	guint interval;
 	/* the expected response for the connectivity check */
 	char *response;
-	/* indicates if the last connection check was successful */
-	gboolean connected;
+	/* indicates the state of the last connection */
+	NMConnectivityState state;
 	/* the source id for the periodic check */
 	guint check_id;
 } NMConnectivityPrivate;
@@ -58,33 +59,33 @@ enum {
 	PROP_URI,
 	PROP_INTERVAL,
 	PROP_RESPONSE,
-	PROP_CONNECTED,
+	PROP_STATE,
 	LAST_PROP
 };
 
 
-gboolean
-nm_connectivity_get_connected (NMConnectivity *connectivity)
+NMConnectivityState
+nm_connectivity_get_state (NMConnectivity *connectivity)
 {
-	g_return_val_if_fail (NM_IS_CONNECTIVITY (connectivity), FALSE);
+	g_return_val_if_fail (NM_IS_CONNECTIVITY (connectivity), NM_CONNECTIVITY_STATE_NOT_CONNECTED);
 
-	return NM_CONNECTIVITY_GET_PRIVATE (connectivity)->connected;
+	return NM_CONNECTIVITY_GET_PRIVATE (connectivity)->state;
 }
 
 static void
-update_connected (NMConnectivity *self, gboolean connected)
+update_state (NMConnectivity *self, NMConnectivityState state)
 {
 	NMConnectivityPrivate *priv = NM_CONNECTIVITY_GET_PRIVATE (self);
-	gboolean old_connected = priv->connected;
+	NMConnectivityState old_state = priv->state;
 
 	if (priv->uri == NULL || priv->interval == 0) {
 		/* Default to connected if no checks are to be run */
-		priv->connected = TRUE;
+		priv->state = NM_CONNECTIVITY_STATE_CONNECTED;
 	} else
-		priv->connected = connected;
+		priv->state = state;
 
-	if (priv->connected != old_connected)
-		g_object_notify (G_OBJECT (self), NM_CONNECTIVITY_CONNECTED);
+	if (priv->state != old_state)
+		g_object_notify (G_OBJECT (self), NM_CONNECTIVITY_STATE);
 }
 
 static void
@@ -93,7 +94,7 @@ nm_connectivity_check_cb (SoupSession *session, SoupMessage *msg, gpointer user_
 	NMConnectivity *self = NM_CONNECTIVITY (user_data);
 	NMConnectivityPrivate *priv = NM_CONNECTIVITY_GET_PRIVATE (self);
 	SoupURI *soup_uri;
-	gboolean connected_new = FALSE;
+	NMConnectivityState state_new = NM_CONNECTIVITY_STATE_NOT_CONNECTED;
 	const char *nm_header;
 	char *uri_string;
 
@@ -104,13 +105,13 @@ nm_connectivity_check_cb (SoupSession *session, SoupMessage *msg, gpointer user_
 	nm_header = soup_message_headers_get_one (msg->response_headers, "X-NetworkManager-Status");
 	if (g_strcmp0 (nm_header, "online") == 0) {
 		nm_log_dbg (LOGD_CORE, "Connectivity check for uri '%s' with Status header successful.", uri_string);
-		connected_new = TRUE;
+		state_new = NM_CONNECTIVITY_STATE_CONNECTED;
 	} else {
 		/* check response */
 		if (msg->response_body->data &&	(g_str_has_prefix (msg->response_body->data, priv->response))) {
 			nm_log_dbg (LOGD_CORE, "Connectivity check for uri '%s' with expected response '%s' successful.",
 				        uri_string, priv->response);
-			connected_new = TRUE;
+			state_new = NM_CONNECTIVITY_STATE_CONNECTED;
 		} else {
 			nm_log_dbg (LOGD_CORE, "Connectivity check for uri '%s' with expected response '%s' failed (status %d).",
 						uri_string, priv->response, msg->status_code);
@@ -119,7 +120,7 @@ nm_connectivity_check_cb (SoupSession *session, SoupMessage *msg, gpointer user_
 	g_free (uri_string);
 
 	/* update connectivity and emit signal */
-	update_connected (self, connected_new);
+	update_state (self, state_new);
 
 	priv->running = FALSE;
 	g_object_notify (G_OBJECT (self), NM_CONNECTIVITY_RUNNING);
@@ -186,7 +187,7 @@ nm_connectivity_stop_check (NMConnectivity *self)
 		priv->check_id = 0;
 	}
 
-	update_connected (self, FALSE);
+	update_state (self, NM_CONNECTIVITY_STATE_NOT_CONNECTED);
 }
 
 NMConnectivity *
@@ -202,7 +203,7 @@ nm_connectivity_new (const gchar *check_uri,
 	                     NM_CONNECTIVITY_RESPONSE, check_response ? check_response : DEFAULT_RESPONSE,
 	                     NULL);
 	g_return_val_if_fail (self != NULL, NULL);
-	update_connected (self, FALSE);
+	update_state (self, NM_CONNECTIVITY_STATE_NOT_CONNECTED);
 
 	return self;
 }
@@ -243,9 +244,6 @@ set_property (GObject *object, guint property_id,
 		g_free (priv->response);
 		priv->response = sanitize_string_val (value);
 		break;
-	case PROP_CONNECTED:
-		priv->connected = g_value_get_boolean (value);
-		break;
 	default:
 		G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
 		break;
@@ -272,8 +270,8 @@ get_property (GObject *object, guint property_id,
 	case PROP_RESPONSE:
 		g_value_set_string (value, priv->response);
 		break;
-	case PROP_CONNECTED:
-		g_value_set_boolean (value, priv->connected);
+	case PROP_STATE:
+		g_value_set_enum (value, priv->state);
 		break;
 	default:
 		G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
@@ -358,11 +356,12 @@ nm_connectivity_class_init (NMConnectivityClass *klass)
 		                      G_PARAM_READWRITE | G_PARAM_CONSTRUCT));
 
 	g_object_class_install_property
-		(object_class, PROP_CONNECTED,
-		 g_param_spec_boolean (NM_CONNECTIVITY_CONNECTED,
-		                       "Connected",
-		                       "Is connected",
-		                       FALSE,
-		                       G_PARAM_READABLE));
+		(object_class, PROP_STATE,
+		 g_param_spec_enum (NM_CONNECTIVITY_STATE,
+		                    "State",
+		                    "Connectivity state",
+		                    NM_TYPE_CONNECTIVITY_STATE,
+		                    NM_CONNECTIVITY_STATE_NOT_CONNECTED,
+		                    G_PARAM_READABLE));
 }
 
