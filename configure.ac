@@ -573,15 +573,23 @@ fi
 AC_DEFINE_UNQUOTED(KERNEL_FIRMWARE_DIR, "$KERNEL_FIRMWARE_DIR", [Define to path of the kernel firmware directory])
 AC_SUBST(KERNEL_FIRMWARE_DIR)
 
+PKG_CHECK_MODULES(LIBXML, [libxml-2.0], [have_libxml=yes],[have_libxml=no])
 PKG_CHECK_MODULES(LIBSOUP, [libsoup-2.4 >= 2.26], [have_libsoup=yes],[have_libsoup=no])
+if test x"$have_libsoup" = x"yes" -a x"$have_libxml" = x"yes"; then
+    can_have_connectivity="yes"
+else
+    can_have_connectivity="no"
+fi
 AC_ARG_ENABLE(concheck, AS_HELP_STRING([--enable-concheck], [enable connectivity checking support]),
-                     [enable_concheck=${enableval}], [enable_concheck=${have_libsoup}])
+                     [enable_concheck=${enableval}], [enable_concheck=${can_have_connectivity}])
 if (test "${enable_concheck}" = "yes"); then
-	if test x"$have_libsoup" = x"no"; then
-		AC_MSG_ERROR(Connectivity checking requires libsoup development headers)
+	if test x"$can_have_connectivity" = x"no"; then
+		AC_MSG_ERROR(Connectivity checking requires libsoup and libxml2 development headers)
 	fi
 	AC_SUBST(LIBSOUP_CFLAGS)
 	AC_SUBST(LIBSOUP_LIBS)
+	AC_SUBST(LIBXML_CFLAGS)
+	AC_SUBST(LIBXML_LIBS)
 	AC_DEFINE(WITH_CONCHECK, 1, [Define if you want connectivity checking support])
 else
 	AC_DEFINE(WITH_CONCHECK, 0, [Define if you want connectivity checking support])

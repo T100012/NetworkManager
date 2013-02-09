@@ -316,7 +316,7 @@ NetworkManager_CPPFLAGS = \
 	-DARP_DEBUG
 
 if WITH_CONCHECK
-NetworkManager_CPPFLAGS += $(LIBSOUP_CFLAGS)
+NetworkManager_CPPFLAGS += $(LIBSOUP_CFLAGS) $(LIBXML_CFLAGS)
 endif
 
 if SESSION_TRACKING_CK
@@ -350,7 +350,7 @@ NetworkManager_LDADD = \
 	$(LIBDL)
 
 if WITH_CONCHECK
-NetworkManager_LDADD += $(LIBSOUP_LIBS)
+NetworkManager_LDADD += $(LIBSOUP_LIBS) $(LIBXML_LIBS)
 endif
 
 NetworkManager_LDFLAGS = -rdynamic
