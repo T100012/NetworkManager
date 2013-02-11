@@ -40,6 +40,7 @@
 #define NM_CONNECTIVITY_INTERVAL  "interval"
 #define NM_CONNECTIVITY_RESPONSE  "response"
 #define NM_CONNECTIVITY_STATE     "state"
+#define NM_CONNECTIVITY_LOGIN_URL "login-url"
 
 typedef enum {
 	NM_CONNECTIVITY_STATE_NOT_CONNECTED,
@@ -58,14 +59,16 @@ typedef struct {
 GType nm_connectivity_get_type (void);
 
 
-NMConnectivity *nm_connectivity_new           (const gchar *check_uri,
-                                               guint check_interval,
-                                               const gchar *check_response);
+NMConnectivity *    nm_connectivity_new           (const gchar *check_uri,
+                                                   guint check_interval,
+                                                   const gchar *check_response);
 
-void                nm_connectivity_start_check (NMConnectivity *connectivity);
+void                nm_connectivity_start_check   (NMConnectivity *connectivity);
 
-void                nm_connectivity_stop_check  (NMConnectivity *connectivity);
+void                nm_connectivity_stop_check    (NMConnectivity *connectivity);
 
-NMConnectivityState nm_connectivity_get_state   (NMConnectivity *connectivity);
+NMConnectivityState nm_connectivity_get_state     (NMConnectivity *connectivity);
+
+const char *        nm_connectivity_get_login_url (NMConnectivity *connectivity);
 
 #endif /* NM_CONNECTIVITY_H */

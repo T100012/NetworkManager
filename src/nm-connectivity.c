@@ -51,6 +51,8 @@ typedef struct {
 	NMConnectivityState state;
 	/* the source id for the periodic check */
 	guint check_id;
+	/* if we are behind a captive portal, this is the url it redirects us */
+	char *login_url;
 } NMConnectivityPrivate;
 
 enum {
@@ -60,6 +62,7 @@ enum {
 	PROP_INTERVAL,
 	PROP_RESPONSE,
 	PROP_STATE,
+	PROP_LOGIN_URL,
 	LAST_PROP
 };
 
@@ -70,6 +73,14 @@ nm_connectivity_get_state (NMConnectivity *connectivity)
 	g_return_val_if_fail (NM_IS_CONNECTIVITY (connectivity), NM_CONNECTIVITY_STATE_NOT_CONNECTED);
 
 	return NM_CONNECTIVITY_GET_PRIVATE (connectivity)->state;
+}
+
+const char *
+nm_connectivity_get_login_url (NMConnectivity *connectivity)
+{
+	g_return_val_if_fail (NM_IS_CONNECTIVITY (connectivity), NULL);
+
+	return NM_CONNECTIVITY_GET_PRIVATE (connectivity)->login_url;
 }
 
 static void
@@ -273,6 +284,9 @@ get_property (GObject *object, guint property_id,
 	case PROP_STATE:
 		g_value_set_enum (value, priv->state);
 		break;
+	case PROP_LOGIN_URL:
+		g_value_set_string (value, priv->login_url);
+		break;
 	default:
 		G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
 		break;
@@ -363,5 +377,13 @@ nm_connectivity_class_init (NMConnectivityClass *klass)
 		                    NM_TYPE_CONNECTIVITY_STATE,
 		                    NM_CONNECTIVITY_STATE_NOT_CONNECTED,
 		                    G_PARAM_READABLE));
+
+	g_object_class_install_property
+		(object_class, PROP_LOGIN_URL,
+		 g_param_spec_string (NM_CONNECTIVITY_LOGIN_URL,
+		                      "Login URL",
+		                      "URL for login as supplied by the captive portal",
+		                      NULL,
+		                      G_PARAM_READABLE));
 }
 
