@@ -120,6 +120,10 @@ static gboolean impl_manager_get_state (NMManager *manager,
                                         guint32 *state,
                                         GError **error);
 
+static gboolean impl_manager_get_captive_portal_state (NMManager *manager,
+                                                       gboolean *behind_captive_portal,
+                                                       char **login_url);
+
 static gboolean impl_manager_set_logging (NMManager *manager,
                                           const char *level,
                                           const char *domains,
@@ -3687,6 +3691,20 @@ impl_manager_get_state (NMManager *manager, guint32 *state, GError **error)
 {
 	nm_manager_update_state (manager);
 	*state = NM_MANAGER_GET_PRIVATE (manager)->state;
+	return TRUE;
+}
+
+static gboolean
+impl_manager_get_captive_portal_state (NMManager *manager, gboolean *behind_captive_portal, char **login_url)
+{
+#if WITH_CONCHECK
+	NMManagerPrivate *priv = NM_MANAGER_GET_PRIVATE (manager);
+	*behind_captive_portal = nm_connectivity_get_state (priv->connectivity) == NM_CONNECTIVITY_STATE_BEHIND_CAPTIVE_PORTAL;
+	*login_url = g_strdup (nm_connectivity_get_login_url (priv->connectivity));
+#else
+	*behind_captive_portal = FALSE;
+	*login_url = NULL;
+#endif
 	return TRUE;
 }
 

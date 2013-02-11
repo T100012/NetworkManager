@@ -253,6 +253,26 @@
       <arg name="state" type="u" direction="out" tp:type="NM_STATE"/>
     </method>
 
+    <method name="CaptivePortalState">
+      <tp:docstring>
+        Indicates whether we are behind a captive portal. If we are, it also gives
+        the login URL supplied by the captive portal. It only makes sense to call
+        this method when the State is NM_STATE_CONNECTED_SITE.
+      </tp:docstring>
+      <annotation name="org.freedesktop.DBus.GLib.CSymbol" value="impl_manager_get_captive_portal_state"/>
+      <arg name="behind_captive_portal" type="b" direction="out">
+        <tp:docstring>
+          The boolean value indicating whether we are behind a captive portal.
+        </tp:docstring>
+      </arg>
+      <arg name="login_url" type="s" direction="out">
+        <tp:docstring>
+          If we are behind a captive portal, this contains the URL used to login on it.
+          A NULL value is valid here, meaning we couldn't guess the login URL.
+        </tp:docstring>
+      </arg>
+    </method>
+
     <property name="NetworkingEnabled" type="b" access="read">
       <tp:docstring>
         Indicates if overall networking is currently enabled or not.  See the
