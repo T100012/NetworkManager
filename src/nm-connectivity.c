@@ -23,6 +23,8 @@
 
 #include <string.h>
 #include <libsoup/soup.h>
+#include <libxml/HTMLparser.h>
+#include <libxml/xpath.h>
 
 #include "nm-connectivity.h"
 #include "nm-logging.h"
@@ -99,6 +101,82 @@ update_state (NMConnectivity *self, NMConnectivityState state)
 		g_object_notify (G_OBJECT (self), NM_CONNECTIVITY_STATE);
 }
 
+static xmlXPathObjectPtr
+getnodeset (xmlDocPtr doc, xmlChar *xpath)
+{
+	xmlXPathContextPtr context;
+	xmlXPathObjectPtr result;
+
+	context = xmlXPathNewContext(doc);
+	if (context == NULL)
+		return NULL;
+
+	result = xmlXPathEvalExpression (xpath, context);
+	xmlXPathFreeContext (context);
+	if (result == NULL)
+		return NULL;
+
+	if (xmlXPathNodeSetIsEmpty (result->nodesetval)) {
+		xmlXPathFreeObject (result);
+		return NULL;
+	}
+
+  return result;
+}
+
+static void
+nm_connectivity_find_login_url (NMConnectivity *self, SoupMessage *msg)
+{
+	NMConnectivityPrivate *priv = NM_CONNECTIVITY_GET_PRIVATE (self);
+	htmlDocPtr doc;
+	xmlNodeSetPtr nodeset;
+	xmlXPathObjectPtr result;
+	xmlChar *keyword;
+	int i;
+	gboolean found;
+
+	doc = htmlReadDoc ((xmlChar *) msg->response_body->data,
+					   NULL,
+					   NULL,
+					   HTML_PARSE_NOERROR | HTML_PARSE_NOWARNING);
+	if (!doc) {
+		nm_log_dbg (LOGD_CORE, "Connectivity failed to discover the URL of the captive portal");
+		return;
+	}
+
+	result = getnodeset (doc, BAD_CAST "//meta");
+	if (!result) {
+		xmlFreeDoc (doc);
+		nm_log_dbg (LOGD_CORE, "Connectivity failed to discover the URL of the captive portal");
+		return;
+	}
+
+	nodeset = result->nodesetval;
+	for (i = 0, found = FALSE; i < nodeset->nodeNr && !found; i++) {
+		keyword = xmlGetProp (nodeset->nodeTab[i], BAD_CAST "http-equiv");
+		if (!xmlStrncmp (keyword, BAD_CAST "refresh", sizeof ("refresh"))) {
+			xmlChar *prop = xmlGetProp (nodeset->nodeTab[i], BAD_CAST "content");
+			if (prop) {
+				gchar **url = g_strsplit ((const char *) prop, "=", 2);
+				if (g_strv_length (url) == 2) {
+					priv->login_url = g_strdup (url[1]);
+					nm_log_dbg (LOGD_CORE, "Connectivity: URL of the captive portal found: %s", url[1]);
+					found = TRUE;
+				}
+				g_strfreev (url);
+				xmlFree (prop);
+			}
+		}
+		xmlFree(keyword);
+	}
+
+	xmlXPathFreeObject (result);
+	xmlFreeDoc (doc);
+
+	if (!found)
+		nm_log_dbg (LOGD_CORE, "Connectivity failed to discover the URL of the captive portal");
+}
+
 static void
 nm_connectivity_check_cb (SoupSession *session, SoupMessage *msg, gpointer user_data)
 {
@@ -112,20 +190,31 @@ nm_connectivity_check_cb (SoupSession *session, SoupMessage *msg, gpointer user_
 	soup_uri = soup_message_get_uri (msg);
 	uri_string = soup_uri_to_string (soup_uri, FALSE);
 
-	/* Check headers; if we find the NM-specific one we're done */
-	nm_header = soup_message_headers_get_one (msg->response_headers, "X-NetworkManager-Status");
-	if (g_strcmp0 (nm_header, "online") == 0) {
-		nm_log_dbg (LOGD_CORE, "Connectivity check for uri '%s' with Status header successful.", uri_string);
-		state_new = NM_CONNECTIVITY_STATE_CONNECTED;
+	g_free (priv->login_url);
+	priv->login_url = NULL;
+
+	/* Check for the 511 status code (captive portals, rfc 6585) */
+	if (msg->status_code == 511) {
+		nm_connectivity_find_login_url (self, msg);
+		nm_log_dbg (LOGD_CORE, "Connectivity check for uri '%s' indicates we are behind a captive portal (status %d). Authentication URL: '%s'",
+		            uri_string, msg->status_code, priv->login_url ? priv->login_url : "Unknown");
+		state_new = NM_CONNECTIVITY_STATE_BEHIND_CAPTIVE_PORTAL;
 	} else {
-		/* check response */
-		if (msg->response_body->data &&	(g_str_has_prefix (msg->response_body->data, priv->response))) {
-			nm_log_dbg (LOGD_CORE, "Connectivity check for uri '%s' with expected response '%s' successful.",
-				        uri_string, priv->response);
+		/* Check headers; if we find the NM-specific one we're done */
+		nm_header = soup_message_headers_get_one (msg->response_headers, "X-NetworkManager-Status");
+		if (g_strcmp0 (nm_header, "online") == 0) {
+			nm_log_dbg (LOGD_CORE, "Connectivity check for uri '%s' with Status header successful.", uri_string);
 			state_new = NM_CONNECTIVITY_STATE_CONNECTED;
 		} else {
-			nm_log_dbg (LOGD_CORE, "Connectivity check for uri '%s' with expected response '%s' failed (status %d).",
-						uri_string, priv->response, msg->status_code);
+			/* check response */
+			if (msg->response_body->data &&	(g_str_has_prefix (msg->response_body->data, priv->response))) {
+				nm_log_dbg (LOGD_CORE, "Connectivity check for uri '%s' with expected response '%s' successful.",
+					        uri_string, priv->response);
+				state_new = NM_CONNECTIVITY_STATE_CONNECTED;
+			} else {
+				nm_log_dbg (LOGD_CORE, "Connectivity check for uri '%s' with expected response '%s' failed (status %d).",
+							uri_string, priv->response, msg->status_code);
+			}
 		}
 	}
 	g_free (uri_string);
